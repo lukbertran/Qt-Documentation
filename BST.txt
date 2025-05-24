@@ -1,0 +1,419 @@
+#include <iostream>
+#include <vector>
+
+using namespace std;
+
+class Node {
+public:
+    int value;
+    Node *left;
+    Node *right;
+
+    Node(int val) : value(val), left(nullptr), right(nullptr) {}
+};
+
+class DoubleLinkedList {
+private:
+    Node *head;
+    Node *tail;
+    size_t size;
+
+public:
+    DoubleLinkedList() : head(nullptr), tail(nullptr), size(0) {}
+
+    ~DoubleLinkedList() {}
+
+    void push_back(int value) {
+        Node *newNode = new Node(value);
+        if (!tail) {
+            head = tail = newNode;
+        } else {
+            newNode->left = tail;
+            tail->right = newNode;
+            tail = newNode;
+        }
+        size++;
+    }
+
+    void push_front(int value) {
+        Node *newNode = new Node(value);
+        if (!head) {
+            head = tail = newNode;
+        } else {
+            newNode->right = head;
+            head->left = newNode;
+            head = newNode;
+        }
+        size++;
+    }
+
+    void print() {
+        Node *current = head;
+        if (!head) cout << "Empty list" << endl;
+        while (current) {
+            cout << current->value << " ";
+            current = current->right;
+        }
+        cout << endl;
+    }
+};
+
+class Binary_Tree {
+private:
+    Node *root;
+    vector<int> Tree;
+
+    Node *insertNode(Node *current, int val) {
+        if (!current) return new Node(val);
+        if (val < current->value) current->left = insertNode(current->left, val);
+        else current->right = insertNode(current->right, val);
+        return current;
+    }
+
+    Node *findMin(Node *current) {
+        while (current->left != nullptr) current = current->left;
+        return current;
+    }
+
+    Node *findMax(Node *current) {
+        while (current->right != nullptr) current = current->right;
+        return current;
+    }
+
+    Node *findLCA(Node *current, int n1, int n2) {
+        if (current == nullptr) return current;
+        if (current->value > n1 && current->value > n2) return findLCA(current->left, n1, n2);
+        if (current->value < n1 && current->value < n2) return findLCA(current->right, n1, n2);
+        return current;
+    }
+
+    void pre_order(Node *current) {
+        if (current == nullptr) return;
+        Tree.push_back(current->value);
+        pre_order(current->left);
+        pre_order(current->right);
+    }
+
+    void in_order(Node *current) {
+        if (current == nullptr) return;
+        in_order(current->left);
+        Tree.push_back(current->value);
+        in_order(current->right);
+    }
+
+    void in_order(Node *current, vector<int> &elements) {
+        if (!current) return;
+        in_order(current->left, elements);
+        elements.push_back(current->value);
+        in_order(current->right, elements);
+    }
+
+    void post_order(Node *current) {
+        if (current == nullptr) return;
+        post_order(current->left);
+        post_order(current->right);
+        Tree.push_back(current->value);
+    }
+
+    void print(int mod) {
+        Tree.clear();
+        if (mod == 1) pre_order(root);
+        else if (mod == 2) in_order(root);
+        else if (mod == 3) post_order(root);
+
+        for (auto u: Tree) cout << u << " ";
+        cout << "\n";
+    }
+
+    bool findEval(Node *current, int eval) {
+        if (!current) return false;
+        if (current->value == eval) return true;
+        return eval < current->value ? findEval(current->left, eval) : findEval(current->right, eval);
+    }
+
+    void convertToDoublyLinkedList(Node *current, Node *&prev, Node *&head) {
+        if (!current) return;
+        convertToDoublyLinkedList(current->left, prev, head);
+        if (!prev) head = current;
+        else {
+            prev->right = current;
+            current->left = prev;
+        }
+        prev = current;
+        convertToDoublyLinkedList(current->right, prev, head);
+    }
+
+    Node *deleteNode(Node *current, int val) {
+        if (!current) return current;
+
+
+        if (val < current->value) {
+            current->left = deleteNode(current->left, val);
+        } else if (val > current->value) {
+            current->right = deleteNode(current->right, val);
+        } else {
+            if (!current->left) {
+                Node *temp = current->right;
+                delete current;
+                return temp;
+            } else if (!current->right) {
+                Node *temp = current->left;
+                delete current;
+                return temp;
+            }
+            Node *temp = findMin(current->right);
+            current->value = temp->value;
+            current->right = deleteNode(current->right, temp->value);
+        }
+        return current;
+    }
+
+    Node *deleteRange(Node *current, int l, int r) {
+        if (current == nullptr) return current;
+        current->left = deleteRange(current->left, l, r);
+        current->right = deleteRange(current->right, l, r);
+        if (current->value >= l && current->value <= r) {
+            return deleteNode(current, current->value);
+        }
+        return current;
+    }
+
+public:
+    Binary_Tree() : root(nullptr) {}
+
+    void insert(int val) {
+        root = insertNode(root, val);
+    }
+
+    void insertMultiple(const vector<int> &values) {
+        for (int val: values) insert(val);
+    }
+
+    void pre_order() {
+        Tree.clear();
+        pre_order(root);
+    }
+
+    void in_order() {
+        Tree.clear();
+        in_order(root);
+    }
+
+    void post_order() {
+        Tree.clear();
+        post_order(root);
+    }
+
+    void printTree(int mod) {
+        print(mod);
+    }
+
+    bool findEval(int eval) {
+        return findEval(root, eval);
+    }
+
+    int findMin() {
+        Node *minNode = findMin(root);
+        return minNode ? minNode->value : -1;
+    }
+
+    int findMax() {
+        Node *maxNode = findMax(root);
+        return maxNode ? maxNode->value : -1;
+    }
+
+    int findLCA(int n1, int n2) {
+        Node *lca = findLCA(root, n1, n2);
+        return lca ? lca->value : -1;
+    }
+
+    void deleteValue(int val) {
+        root = deleteNode(root, val);
+    }
+
+    int findKshSmallest(int k) {
+        vector<int> elements;
+        in_order(root, elements);
+        if (k <= 0 || k > elements.size()) return -1;
+        return elements[k - 1];
+    }
+
+    int findPredecessor(int val) {
+        Node *current = root;
+        Node *predecessor = nullptr;
+        while (current) {
+            if (val > current->value) {
+                predecessor = current;
+                current = current->right;
+            } else {
+                current = current->left;
+            }
+        }
+        return predecessor ? predecessor->value : -1;
+    }
+
+    int findSuccessor(int val) {
+        Node *current = root;
+        Node *successor = nullptr;
+        while (current) {
+            if (val < current->value) {
+                successor = current;
+                current = current->left;
+            } else {
+                current = current->right;
+            }
+        }
+        return successor ? successor->value : -1;
+    }
+
+    void convertToDLL(Node *&head) {
+        Node *prev = nullptr;
+        convertToDoublyLinkedList(root, prev, head);
+    }
+
+    void deleteRange(int l, int r) {
+        root = deleteRange(root, l, r);
+    }
+};
+
+void printMenu() {
+    cout << "Select the command from the list:\n";
+    cout << "0: Exit\n1: Insert an element\n2: Insert multiple elements\n3: Pre-order\n";
+    cout << "4: In-order\n5: Post-order\n6: Print tree\n7: Find an element by value\n";
+    cout << "8: Find the minimum element\n9: Find the maximum element\n10: Delete an element by value\n";
+    cout << "11: Find Ksh smallest element\n12: Find predecessor\n13: Find successor\n";
+    cout << "14: Find predecessor and successor at the same time\n15: Find LCA of the two nodes\n";
+    cout << "16: Convert to a sorted double linked list\n17: Deletion of all nodes with keys in the range l to r\n";
+    cout << "18: Print menu\n";
+}
+
+
+int main() {
+    Binary_Tree b;
+    vector<int> values;
+    int command, n, x, mod, k, n1, n2, rez, l, r, successor, predecessor;
+    Node *head = nullptr;
+    Node *current = head;
+    printMenu();
+    do {
+        cin >> command;
+        switch (command) {
+            case 0:
+                exit(0);
+            case 1:
+                cout << "Enter the element to insert:\n";
+                cin >> x;
+                b.insert(x);
+                cout << "Element inserted successfully.\n";
+                break;
+            case 2:
+                values.clear();
+                cout << "Enter number of elements to insert:\n";
+                cin >> n;
+                cout << "Enter elements:\n";
+                for (int i = 0; i < n; i++) {
+                    cin >> x;
+                    values.push_back(x);
+                }
+                b.insertMultiple(values);
+                cout << "Elements inserted successfully.\n";
+                break;
+            case 3:
+                b.pre_order();
+                cout << "Traversal complete.\n";
+                break;
+            case 4:
+                b.in_order();
+                cout << "Traversal complete.\n";
+                break;
+            case 5:
+                b.post_order();
+                cout << "Traversal complete.\n";
+                break;
+            case 6:
+                cout << "Select a print mod:\n1: Pre-order\n2: In-order\n3: Post-order\n";
+                cin >> mod;
+                b.printTree(mod);
+                break;
+            case 7:
+                cout << "Enter value to find:\n";
+                cin >> x;
+                cout << (b.findEval(x) ? "Element found" : "Element not found") << "\n";
+                break;
+            case 8:
+                cout << "Minimum element: " << b.findMin() << "\n";
+                break;
+            case 9:
+                cout << "Maximum element: " << b.findMax() << "\n";
+                break;
+            case 10:
+                cout << "Enter value to delete:\n";
+                cin >> x;
+                b.deleteValue(x);
+                cout << "The element was successfully deleted.\n";
+                break;
+            case 11:
+                cout << "Enter k:\n";
+                cin >> k;
+                rez = b.findKshSmallest(k);
+                if (rez == -1) {
+                    cerr << "Error::Incorrect value of k\n";
+                } else {
+                    cout << rez << "\n";
+                }
+                break;
+            case 12:
+                cout << "Enter the value:\n";
+                cin >> x;
+                rez = b.findPredecessor(x);
+                if (rez == -1) cout << "No predecessor exists for this node\n";
+                else cout << rez << "\n";
+                break;
+            case 13:
+                cout << "Enter the value:\n";
+                cin >> x;
+                rez = b.findSuccessor(x);
+                if (rez == -1) cout << "No successor exists for this node\n";
+                else cout << rez << "\n";
+                break;
+            case 14:
+                cout << "Enter the value:\n";
+                cin >> x;
+                predecessor = b.findPredecessor(x);
+                successor = b.findSuccessor(x);
+                if (predecessor != -1) cout << "Predecessor of " << x << " is " << predecessor << "\n";
+                else cout << "No predecessor exists for this node\n";
+                if (successor != -1) cout << "Successor of " << x << " is " << successor << "\n";
+                else cout << "No successor exists for this node\n";
+                break;
+            case 15:
+                cout << "Enter two values:\n";
+                cin >> n1 >> n2;
+                cout << b.findLCA(n1, n2) << "\n";
+                break;
+            case 16:
+                b.convertToDLL(head);
+                cout << "BST successfully converted to Sorted Doubly Linked List.\n";
+                cout << "Doubly Linked List: ";
+                current = head;
+                while (current) {
+
+                    cout << current->value << " ";
+                    current = current->right;
+                }
+                cout << "\n";
+                break;
+            case 17:
+                cout << "Enter l and r:\n";
+                cin >> l >> r;
+                b.deleteRange(l, r);
+                cout << "Nodes with keys between l and r have been successfully deleted\n";
+                break;
+            case 18:
+                printMenu();
+                break;
+            default:
+                cerr << "Error::Invalid command\n";
+        }
+    } while (true);
+}

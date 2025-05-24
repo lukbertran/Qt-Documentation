@@ -1,0 +1,254 @@
+class Node {
+public:
+    int data;
+    Node *next;
+
+    Node(int value) : data(value), next(nullptr) {
+    }
+};
+
+class LinkedList {
+private:
+    Node *head;
+    size_t size;
+public:
+    LinkedList() : head(nullptr), size(0) {
+    }
+    ~LinkedList() {
+        clear();
+    }
+    void push_back(int value) {
+        Node *newNode = new Node(value);
+        if (!head) {
+            head = newNode;
+        } else {
+            Node *current = head;
+            while (current->next) {
+                current = current->next;
+            }
+            current->next = newNode;
+        }
+        size++;
+    }
+    void push_multiple(int count) {
+        cout << "Enter " << count << " elements: ";
+        for (int i = 0; i < count; i++) {
+            int value;
+            cin >> value;
+            push_back(value);
+        }
+    }
+    void remove_first(int value) {
+        if (!head) return;
+        if (head->data == value) {
+            Node *temp = head;
+            head = head->next;
+            delete temp;
+            size--;
+            return;
+        }
+        Node *current = head;
+        while (current->next && current->next->data != value) {
+            current = current->next;
+        }
+        if (current->next) {
+            Node *temp = current->next;
+            current->next = current->next->next;
+            delete temp;
+            size--;
+        }
+    }
+    void remove_range(int start, int end) {
+        if (!head || start > end) return;
+        Node *helpnode = new Node(0);
+        helpnode->next = head;
+        Node *prev = helpnode;
+        for (int i = 0; i < start && prev->next; i++) {
+            prev = prev->next;
+        }
+        Node *current = prev->next;
+        for (int i = start; i <= end && current; i++) {
+            Node *temp = current;
+            current = current->next;
+            delete temp;
+            size--;
+        }
+        prev->next = current;
+        head = helpnode->next;
+        delete helpnode;
+    }
+    void remove_all(int value) {
+        while (head && head->data == value) {
+            Node *temp = head;
+            head = head->next;
+            delete temp;
+            size--;
+        }
+        Node *current = head;
+        while (current && current->next) {
+            if (current->next->data == value) {
+                Node *temp = current->next;
+                current->next = current->next->next;
+                delete temp;
+                size--;
+            } else {
+                current = current->next;
+            }
+        }
+    }
+    void print() {
+        Node *current = head;
+        if (!current) {
+            cout << "Empty list" << endl;
+            return;
+        }
+        while (current) {
+            cout << current->data << " ";
+            current = current->next;
+        }
+        cout << endl;
+    }
+    void find_by_index(int index) {
+        Node *current = head;
+        for (int i = 0; current && i < index; i++) {
+            current = current->next;
+        }
+        if (current) {
+            cout << "Element at index " << index << ": " << current->data << endl;
+        } else {
+            cout << "Index out of range" << endl;
+        }
+    }
+    void find_by_value(int value) {
+        Node *current = head;
+        while (current) {
+            if (current->data == value) {
+                cout << "Value found!" << endl;
+                return;
+            }
+            current = current->next;
+        }
+        cout << "Value not found." << endl;
+    }
+    void clear() {
+        while (head) {
+            Node *temp = head;
+            head = head->next;
+            delete temp;
+        }
+        size = 0;
+    }
+    void remove_last() {
+        if (!head) return;
+        if (!head->next) {
+            delete head;
+            head = nullptr;
+            size--;
+            return;
+        }
+        Node *current = head;
+        while (current->next->next) {
+            current = current->next;
+        }
+        delete current->next;
+        current->next = nullptr;
+        size--;
+    }
+    void reverse() {
+
+        Node *prev = nullptr, *current = head, *next = nullptr;
+        while (current) {
+            next = current->next;
+            current->next = prev;
+            prev = current;
+            current = next;
+        }
+        head = prev;
+    }
+    size_t get_size() const {
+        return size;
+    }
+};
+
+int main() {
+    LinkedList sll;
+    int selection, element, index, count, start, end;
+
+    do {
+        cout << "Select a command:\n";
+        cout << "0: Exit\n";
+        cout << "1: Add element to the end\n";
+        cout << "2: Add multiple elements\n";
+        cout << "3: Remove first occurrence of a value\n";
+        cout << "4: Remove range\n";
+        cout << "5: Remove all occurrences\n";
+        cout << "6: Print list\n";
+        cout << "7: Find by index\n";
+        cout << "8: Find by value\n";
+        cout << "9: Clear list\n";
+        cout << "10: Remove last element\n";
+        cout << "11: Reverse list\n";
+        cout << "12: Get size of list\n";
+
+        cin >> selection;
+
+        switch (selection) {
+            case 0:
+                return 0;
+            case 1:
+                cout << "Enter value: ";
+                cin >> element;
+                sll.push_back(element);
+                break;
+            case 2:
+                cout << "Enter number of elements: ";
+                cin >> count;
+                sll.push_multiple(count);
+                break;
+            case 3:
+                cout << "Enter value: ";
+                cin >> element;
+                sll.remove_first(element);
+                break;
+            case 4:
+                cout << "Enter start and end index: ";
+                cin >> start >> end;
+                sll.remove_range(start, end);
+                break;
+            case 5:
+                cout << "Enter value: ";
+                cin >> element;
+                sll.remove_all(element);
+                break;
+            case 6:
+                sll.print();
+                break;
+            case 7:
+                cout << "Enter index: ";
+                cin >> index;
+                sll.find_by_index(index);
+                break;
+            case 8:
+                cout << "Enter value: ";
+                cin >> element;
+                sll.find_by_value(element);
+                break;
+            case 9:
+                sll.clear();
+                cout << "List cleared.\n";
+                break;
+            case 10:
+                sll.remove_last();
+                break;
+            case 11:
+                sll.reverse();
+                cout << "List reversed.\n";
+                break;
+            case 12:
+                cout << "Size of list: " << sll.get_size() << endl;
+                break;
+            default:
+                cout << "Error: there is no such command\n";
+        }
+    } while (true);
+}

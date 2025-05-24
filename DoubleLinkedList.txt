@@ -1,0 +1,310 @@
+#include <bits/stdc++.h>
+
+using namespace std;
+
+typedef long long ll;
+
+// Определяем класс узла двусвязного списка
+class Node {
+public:
+    int data; // Значение, хранящееся в узле
+    Node *next; // Указатель на следующий узел
+    Node *prev; // Указатель на предыдущий узел
+
+    // Конструктор для инициализации узла заданным значением
+    Node(int value) : data(value), next(nullptr), prev(nullptr) {
+    }
+};
+
+// Определяем класс двусвязного списка
+class DoubleLinkedList {
+private:
+    Node *head; // Указатель на начало списка
+    Node *tail; // Указатель на конец списка
+    size_t size; // Размер списка
+
+public:
+    DoubleLinkedList() : head(nullptr), tail(nullptr), size(0) {} // Конструктор по умолчанию
+
+    ~DoubleLinkedList() { // Деструктор, очищающий список
+        clear();
+    }
+
+    void push_back(int value) { // Добавляем элемент в конец списка
+        Node *newNode = new Node(value); // Создаем новый узел
+        if (!tail) { // Если список пуст
+            head = tail = newNode; // Голова и хвост указывают на новый узел
+        } else { // Если список не пуст
+            newNode->prev = tail; // Новый узел указывает на предыдущий хвост
+            tail->next = newNode; // Предыдущий хвост указывает на новый узел
+            tail = newNode; // Новый узел становится хвостом
+        }
+        size++; // Увеличиваем размер списка
+    }
+
+    void push_front(int value) { // Добавляем элемент в начало списка
+        Node *newNode = new Node(value); // Создаем новый узел
+        if (!head) { // Если список пуст
+            head = tail = newNode; // Голова и хвост указывают на новый узел
+        } else { // Если список не пуст
+            newNode->next = head; // Новый узел указывает на предыдущую голову
+            head->prev = newNode; // Предыдущая голова указывает на новый узел
+            head = newNode; // Новый узел становится головой
+        }
+        size++; // Увеличиваем размер списка
+    }
+
+    Node *find_by_value(int value) { // Поиск узла по значению
+        Node *current = head; // Начинаем с головы
+        while (current) { // Пока не дойдем до конца
+            if (current->data == value) { // Если нашли нужное значение
+                return current; // Возвращаем указатель на узел
+            }
+            current = current->next; // Переходим к следующему узлу
+        }
+        return nullptr; // Значение не найдено
+    }
+
+    Node *find_by_index(size_t index) { // Поиск узла по индексу
+        if (index >= size) { // Если индекс вне диапазона
+            return nullptr; // Возвращаем null
+        }
+        Node *current = head; // Начинаем с головы
+        for (size_t i = 0; i < index; ++i) { // Проходим до нужного индекса
+            current = current->next;
+        }
+        return current; // Возвращаем указатель на найденный узел
+    }
+
+    void remove_node(Node *del) { // Удаляем узел
+        if (del->prev) del->prev->next = del->next; // Связываем предыдущий узел с следующим
+        if (del->next) del->next->prev = del->prev; // Связываем следующий узел с предыдущим
+        if (del == head) head = del->next; // Если удаляемая нода — голова, обновляем её
+        if (del == tail) tail = del->prev; // Если удаляемая нода — хвост, обновляем его
+        delete del; // Удаляем узел
+        size--; // Уменьшаем размер списка
+    }
+
+    void remove_by_value(int value) { // Удаление узла по значению
+        Node *del = find_by_value(value); // Находим узел
+        if (!del) return; // Если не найден, выходим
+        remove_node(del); // Удаляем найденный узел
+    }
+
+    void remove_by_index(size_t index) { // Удаление узла по индексу
+        Node *del = find_by_index(index); // Находим узел
+        if (!del) return; // Если не найден, выходим
+        remove_node(del); // Удаляем найденный узел
+    }
+
+
+    void remove_range(size_t start, size_t end) { // Удаление диапазона узлов
+        if (start >= size || end >= size || start > end) return; // Проверка корректности диапазона
+        Node *first = find_by_index(start); // Находим начальный узел
+        Node *last = find_by_index(end); // Находим конечный узел
+
+        if (!first || !last) return; // Если не найдены, выходим
+
+        if (first->prev) first->prev->next = last->next; // Связываем узел перед first с узлом после last
+        if (last->next) last->next->prev = first->prev; // Связываем узел после last с узлом перед first
+
+        if (first == head) head = last->next; // Если first — голова, обновляем её
+        if (last == tail) tail = first->prev; // Если last — хвост, обновляем его
+
+        Node *current = first; // Начинаем удалять узлы
+        while (current != last->next) { // Пока не дойдем до узла после last
+            Node *temp = current; // Временный указатель
+            current = current->next; // Переходим к следующему узлу
+            delete temp; // Удаляем текущий
+            size--; // Уменьшаем размер списка
+        }
+    }
+
+    void clear() { // Очистка всего списка
+        while (head) { // Пока есть элементы
+            Node *temp = head; // Временный указатель
+            head = head->next; // Переходим к следующему узлу
+            delete temp; // Удаляем текущий
+        }
+        tail = nullptr; // Обнуляем хвост
+        size = 0; // Размер списка 0
+    }
+
+    void reverse() { // Переворачиваем список
+        Node *current = head; // Начинаем с головы
+        Node *temp = nullptr; // Временный указатель
+        while (current) { // Пока не дойдем до конца
+            temp = current->prev; // Сохраняем предыдущий узел
+            current->prev = current->next; // Меняем местами prev и next
+            current->next = temp; // Продолжаем перестановку
+            current = current->prev; // Переходим к следующему узлу
+        }
+        if (temp) head = temp->prev; // Обновляем голову
+    }
+
+    void print() { // Выводим список
+        Node *current = head; // Начинаем с головы
+        if (!head) cout << "Empty list" << endl; // Если пусто
+        while (current) { // Пока не конец
+            cout << current->data << " "; // Выводим значение
+            current = current->next; // Переходим к следующему узлу
+        }
+        cout << endl; // Перенос строки
+    }
+
+    void merge(DoubleLinkedList &secondDLL) { // Слияние двух списков
+        if (!secondDLL.head) return; // Если второй список пуст, выходим
+        if (!head) { // Если первый список пуст
+            head = secondDLL.head; // Присваиваем ему второй
+            tail = secondDLL.tail;
+        } else { // Если первый список не пуст
+            tail->next = secondDLL.head; // Присоединяем второй к первому
+            secondDLL.head->prev = tail; // Связываем хвост первого с головой второго
+            tail = secondDLL.tail; // Обновляем хвост
+        }
+        size += secondDLL.size; // Увеличиваем размер
+    }
+
+    void replace_first(int old_value, int new_value) { // Замена первого вхождения значения
+        Node *target = find_by_value(old_value); // Ищем узел
+        if (target) target->data = new_value; // Если найден, заменяем значение
+    }
+
+    void replace_all(int old_value, int new_value) { // Замена всех вхождений значения
+        Node *current = head; // Начинаем с головы
+        while (current) { // Пока не конец
+            if (current->data == old_value) current->data = new_value; // Если совпадает, заменяем
+            current = current->next; // Переходим к следующему узлу
+        }
+    }
+};
+
+int main() {
+    DoubleLinkedList dll; // Создаем экземпляр списка
+    int selection, element, old_value, new_value, start, end, value, index, k;
+    DoubleLinkedList dll2; // Второй список для слияния
+
+
+    cout << "Select the command from the list:\n";
+    cout << "0: Exit\n";
+    cout << "1: Add an element to the end\n";
+    cout << "2: Add an element at the beginning\n";
+    cout << "3: Remove an element by value\n";
+    cout << "4: Remove an element by index\n";
+    cout << "5: Remove a range of elements\n";
+    cout << "6: Replace first occurrence of a value\n";
+    cout << "7: Replace all occurrences of a value\n";
+    cout << "8: Reverse the list\n";
+    cout << "9: Print the list\n";
+    cout << "10: Clear the list\n";
+    cout << "11: List merge\n";
+    cout << "12: Find by value\n";
+    cout << "13: Find by index\n";
+
+    do {
+        cin >> selection;
+
+        switch (selection) {
+            case 0:
+                return 0; // Завершаем выполнение программы
+
+            case 1:
+                cout << "Enter the element to add at the end:\n";
+                cin >> element;
+                dll.push_back(element);
+                cout << "Element added successfully.\n";
+                break;
+
+            case 2:
+                cout << "Enter the element to add at the beginning:\n";
+                cin >> element;
+                dll.push_front(element);
+                cout << "Element added successfully.\n";
+                break;
+
+            case 3:
+                cout << "Enter the value to remove:\n";
+                cin >> element;
+                dll.remove_by_value(element);
+                cout << "Element removed if found.\n";
+                break;
+
+            case 4:
+                cout << "Enter the index to remove:\n";
+                cin >> element;
+                dll.remove_by_index(element);
+                cout << "Element removed if index was valid.\n";
+                break;
+
+            case 5:
+                cout << "Enter start and end index of range to remove:\n";
+                cin >> start >> end;
+                dll.remove_range(start, end);
+                cout << "Elements removed if range was valid.\n";
+                break;
+
+            case 6:
+                cout << "Enter the old and new values to replace first occurrence:\n";
+                cin >> old_value >> new_value;
+                dll.replace_first(old_value, new_value);
+                cout << "Replacement done if value was found.\n";
+                break;
+
+            case 7:
+                cout << "Enter the old and new values to replace all occurrences:\n";
+                cin >> old_value >> new_value;
+                dll.replace_all(old_value, new_value);
+                cout << "All occurrences replaced if value was found.\n";
+                break;
+
+            case 8:
+                dll.reverse();
+                cout << "List reversed.\n";
+                break;
+
+            case 9:
+                cout << "List elements:\n";
+                dll.print();
+                break;
+
+            case 10:
+                dll.clear();
+                cout << "List cleared.\n";
+                break;
+
+            case 11:
+                cout << "Enter the number of elements for the second list: ";
+                cin >> k;
+                cout << "Enter elements for the second list: ";
+                for (int i = 0; i < k; i++) {
+                    cin >> element;
+                    dll2.push_back(element);
+                }
+                dll.merge(dll2);
+                cout << "Lists merged.\n";
+                break;
+            case 12:
+                cout << "Enter value to find: ";
+                cin >> value;
+                if (dll.find_by_value(value)) {
+                    cout << "Element found!\n";
+                } else {
+                    cout << "Element not found.\n";
+                }
+                break;
+            case 13:
+                cout << "Enter index to find: ";
+                cin >> index;
+                if (dll.find_by_index(index)) {
+                    cout << "Element found at index " << index << "\n";
+                } else {
+                    cout << "Error::index out of range.\n";
+                }
+                break;
+
+
+            default:
+                cout << "Error::there is no such command\n";
+        }
+    } while (true);
+}

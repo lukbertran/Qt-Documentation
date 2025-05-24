@@ -1,0 +1,194 @@
+// mainwindow.h
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow>
+#include <QTimer>
+#include <QPixmap>
+#include <QPainter>
+#include <QPaintEvent>
+#include <QColor>
+#include <QPointF>
+#include <QBrush>
+#include <QPen>
+#include <QDebug>
+#include <QPainterPath>
+
+#include <cmath>
+#include <vector>
+
+#define LAMBDA 43.0 // длина волны
+#define AMPLITUDE 10.0 // амплитуда волны
+#define LEVEL 0.9 // средняя линия
+#define SHIP_WIDTH 150
+#define SHIP_HEIGHT 150
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+    QPixmap * ship; // промежуточный буфер для рисования
+    void drawShip();
+    double phase;
+    double sunAngle = 0;
+
+    std::vector<QPointF> clouds; // вектор облаков, QPointF - описание точки в двухмерной системе
+
+    QTimer *timer;
+    double calc(double x);
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+    void paintEvent(QPaintEvent *event) override;
+    // QPaintEvent - класс, который содержит параметры события для отрисовки виджета
+public slots: // функции, вызываемые в ответ на сигналы
+    void onTimer();
+};
+#endif // MAINWINDOW_H
+
+// mainwindow.cpp
+#include "mainwindow.h"
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+    this->resize(640, 480);
+    this->setWindowTitle("Animation");
+    this->timer = new QTimer();
+    connect(this->timer, &QTimer::timeout, this, &MainWindow::onTimer);
+
+    this->drawShip();
+
+    this->phase = 0;
+
+    int count = 12;
+    for (int i = 0; i < count; ++i) {
+        clouds.push_back(QPointF(150 + i * 200, 80 + 20 * (i % 2)));
+    }
+
+    this->timer->start(50);
+}
+
+MainWindow::~MainWindow()
+{
+    delete this->ship;
+    this->timer->stop();
+    delete this->timer;
+}
+
+void MainWindow::drawShip() {
+    this->ship = new QPixmap(SHIP_WIDTH, SHIP_HEIGHT);
+
+    QPainter p(this->ship);
+    QPolygon sail;
+    sail << QPoint(SHIP_WIDTH / 2, 0)
+         << QPoint(SHIP_WIDTH / 2, SHIP_HEIGHT / 2)
+         << QPoint(SHIP_WIDTH / 4, SHIP_HEIGHT / 2);
+    p.setBrush(QBrush("#ffffff"));
+    p.drawPolygon(sail); // сбрасываем/отрисовываем
+
+    p.setPen(QPen(QColor("#000000"), 3));
+    p.drawLine(SHIP_WIDTH / 2, 0, SHIP_WIDTH / 2, SHIP_HEIGHT);
+
+    QPainterPath deck;
+    deck.moveTo(0, SHIP_HEIGHT * 0.75);
+    deck.lineTo(SHIP_WIDTH, SHIP_HEIGHT * 0.75);
+    deck.lineTo(SHIP_WIDTH * 0.8, SHIP_HEIGHT);
+    deck.lineTo(SHIP_WIDTH * 0.2, SHIP_HEIGHT);
+    deck.closeSubpath();
+    p.setBrush(QBrush("#8B4513"));
+    p.drawPath(deck);
+
+    p.end();
+}
+
+double MainWindow::calc(double x)
+{
+    return LEVEL * this->height() + AMPLITUDE * std::sin(x / LAMBDA * M_PI + phase);
+}
+
+void MainWindow::paintEvent(QPaintEvent *event) {
+    QPixmap buffer(this->size());
+    buffer.fill(QColor("#87CEFA"));
+
+    QPainter p(&buffer);
+    p.begin(this);
+
+    QPointF sunCenter(this->width() - 10, 10);
+    int rayLength = 50;
+    int rayCount = 12;
+
+    p.setPen(QPen(QColor("#fde910"), 2));
+
+    for (int i = 0; i < rayCount; ++i) {
+        double angle = this->sunAngle + i * 2 * M_PI / rayCount;
+        QPointF start = sunCenter + QPointF(100 * std::cos(angle), 100 * std::sin(angle));
+        QPointF end = sunCenter + QPointF((100 + rayLength) * std::cos(angle), (100 + rayLength) * std::sin(angle));
+        p.drawLine(start, end);
+    }
+
+    p.setPen(QPen("#fde910"));
+    p.setBrush(QBrush("#fde910"));
+    p.drawEllipse(QPointF(this->width(), 0), 100, 100);
+
+    double x1 = (this->width() - SHIP_WIDTH) / 2;
+    double x2 = x1 + SHIP_WIDTH;
+    double y1 = this->calc(x1);
+    double y2 = this->calc(x2);
+    double alpha = std::atan((y2 - y1) / (x2 - x1));
+    QTransform t;
+    t.QTransform::rotateRadians(alpha);
+    QPixmap _ship = this->ship->transformed(t);
+    p.drawPixmap(
+        (this->width() - _ship.width()) / 2,
+        this->height() * LEVEL - _ship.height() + 2 * AMPLITUDE,
+        _ship
+    );
+
+    p.setPen(QPen("#4169E1"));
+    p.setBrush(QBrush("#4169E1"));
+    std::vector<QPointF> points;
+    for (int x = 0; x < this->width(); ++x) {
+        double y = LEVEL * this->height() + AMPLITUDE  * std::sin(x / LAMBDA * M_PI + phase);
+        points.push_back(QPointF(x, y));
+
+    }
+    points.push_back(QPointF(this->width(), this->height()));
+    points.push_back(QPointF(0, this->height()));
+    p.drawPolygon(points.data(), points.size());
+
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QBrush("#ffffff"));
+
+    for (QPointF cloudPos : clouds) {
+        p.drawEllipse(cloudPos + QPointF(-30, 0), 30, 30);
+        p.drawEllipse(cloudPos + QPointF(0, -10), 40, 40);
+        p.drawEllipse(cloudPos + QPointF(30, 0), 30, 30);
+    }
+
+    p.end();
+
+    QPainter screen(this);
+    screen.drawPixmap(0, 0, buffer);
+}
+
+void MainWindow::onTimer() {
+    this->phase += 0.1;
+    this->sunAngle += 0.5;
+    if (std::fabs(this->phase - 2 * M_PI) < 0.1)
+        this->phase = 0;
+
+    if (this->sunAngle > 2 * M_PI)
+        this->sunAngle -= 2 * M_PI;
+
+    for (auto &cloud : clouds) {
+        cloud.setX(cloud.x() - 1);
+        if (cloud.x() < -100) {
+            cloud.setX(this->width() + 100);
+        }
+    }
+
+    this->update();
+}
+

@@ -1,0 +1,163 @@
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow> // класс, реализующий функционал главного окна
+#include <QVBoxLayout> //
+#include <QPushButton>
+#include <QLineEdit> // виджет, позволяющий вводить и выводить текст в одну строку
+#include <QListWidget> // виджет для отображения списка элементов
+#include <QTextStream> // класс, который представляет интерфейс для чтения и записи текстовых данных
+#include <QCloseEvent>
+
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+
+
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+public slots:
+    void addTask();
+    void removeTask();
+    void saveTasks();
+    void loadTasks();
+    void renumberTasks();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
+private:
+    QLineEdit *taskInput;
+    QListWidget *taskList;
+
+    int number = 1;
+
+
+};
+#endif // MAINWINDOW_H
+
+
+//mainwindow.cpp
+#include "mainwindow.h"
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+    QWidget *centralWidget = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(centralWidget);
+
+    taskInput = new QLineEdit(this);
+    QPushButton *addButton = new QPushButton("Добавить", this);
+    taskList = new QListWidget(this);
+    QPushButton *removeButton = new QPushButton("Удалить", this);
+
+    layout->addWidget(taskInput);
+    layout->addWidget(addButton);
+    layout->addWidget(taskList);
+    layout->addWidget(removeButton);
+
+    setCentralWidget(centralWidget);
+
+    setFixedSize(300, 400);
+
+    connect(addButton, &QPushButton::clicked, this, &MainWindow::addTask);
+    connect(removeButton, &QPushButton::clicked, this, &MainWindow::removeTask);
+
+}
+
+MainWindow::~MainWindow()
+{
+
+}
+
+void MainWindow::renumberTasks() {
+    for(int i = 0; i < taskList->count(); ++i) {
+        QListWidgetItem *item = taskList->item(i);
+        QString text = item->text();
+
+        int index = text.indexOf(". ");
+        if (index != -1) {
+            text = text.mid(index + 2);
+        }
+
+        item->setText(QString::number(i + 1) + ". " + text);
+    }
+
+    number = taskList->count() + 1;
+}
+
+void MainWindow::addTask() {
+    QString taskText = taskInput->text().trimmed();
+    if (!taskText.isEmpty()) {
+        QString task = QString::number(number) + ". " + taskText;
+        taskList->addItem(task);
+        number++;
+        taskInput->clear();
+    }
+}
+
+void MainWindow::removeTask() {
+    QListWidgetItem *item = taskList->currentItem();
+    if (item) {
+        delete item;
+        renumberTasks();
+    }
+}
+
+void MainWindow::saveTasks() {
+    QJsonArray taskArray;
+
+    for (int i = 0; i < taskList->count(); ++i) {
+        QString fullText = taskList->item(i)->text();
+        int index = fullText.indexOf(". ");
+        QString text = (index != -1) ? fullText.mid(index + 2) : fullText;
+
+        QJsonObject taskObject;
+        taskObject["text"] = text;
+        taskArray.append(taskObject);
+    }
+
+    QJsonDocument doc(taskArray);
+    QFile file("tasks.json");
+    if(file.open(QIODevice::WriteOnly)) {
+        file.write(doc.toJson());
+        file.close();
+    }
+
+}
+
+void MainWindow::loadTasks() {
+    QFile file("tasks.json");
+    if (!file.open(QIODevice::ReadOnly))
+        return;
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonArray taskArray = doc.array();
+
+    taskList->clear();
+    number = 1;
+
+    for (const QJsonValue &value : taskArray) {
+        QString text = value.toObject().value("text").toString();
+        QString task = QString::number(number) + ". " + text;
+        taskList->addItem(task);
+        number++;
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    saveTasks();
+    QMainWindow::closeEvent(event);
+}
+

@@ -1,0 +1,332 @@
+//ball.h
+#ifndef BALL_H
+#define BALL_H
+
+#include <QColor>
+#include <QPointF>
+#include <QPainter>
+
+class Ball {
+public:
+    Ball(const QPointF& pos, const QPointF& speed, const QColor& color);
+
+    void update(const QSize& bounds);
+    void draw(QPainter& painter) const;
+
+    void collide(Ball& other);
+
+    QColor color;
+
+    QPointF getPosition() const { return position; }
+    QPointF getSpeed() const { return speed; }
+    void setSpeed(const QPointF& newSpeed) { speed = newSpeed; }
+    double getRadius() const { return radius; }
+
+private:
+    QPointF position;
+    QPointF speed;
+    double radius = 20.0;
+};
+
+#endif // BALL_H
+
+//ball.cpp
+#include "ball.h"
+#include <QPainter>
+
+Ball::Ball(const QPointF& pos, const QPointF& speed, const QColor& color)
+    : position(pos), speed(speed), color(color) {}
+
+void Ball::update(const QSize& bounds) {
+    position += speed;
+
+    double width = bounds.width();
+    double height = bounds.height();
+
+    if (position.x() - radius < 0) {
+        position.setX(radius);
+        speed.setX(-speed.x());
+    } else if (position.x() + radius > width) {
+        position.setX(width - radius);
+        speed.setX(-speed.x());
+    }
+
+    if (position.y() - radius < 0) {
+        position.setY(radius);
+        speed.setY(-speed.y());
+    } else if (position.y() + radius > height) {
+        position.setY(height - radius);
+        speed.setY(-speed.y());
+    }
+}
+
+void Ball::draw(QPainter& painter) const {
+    painter.setBrush(color);
+    painter.setPen(color);
+    painter.drawEllipse(position, radius, radius);
+}
+
+void Ball::collide(Ball& other) {
+    QPointF delta = other.position - position;
+    double dist = std::sqrt(delta.x() * delta.x() + delta.y() * delta.y());
+    double minDist = radius + other.radius;
+
+    if (dist < minDist && dist > 0) {
+        QPointF normal = delta / dist;
+
+        QPointF v1 = speed;
+        QPointF v2 = other.speed;
+
+        QPointF v1n = normal * QPointF::dotProduct(v1, normal);
+        QPointF v1t = v1 - v1n;
+        QPointF v2n = normal * QPointF::dotProduct(v2, normal);
+        QPointF v2t = v2 - v2n;
+
+        speed = v1t + v2n;
+        other.speed = v2t + v1n;
+
+        speed = speed / std::sqrt(speed.x()*speed.x() + speed.y()*speed.y()) * std::sqrt(v1.x()*v1.x() + v1.y()*v1.y());
+        other.speed = other.speed / std::sqrt(other.speed.x()*other.speed.x() + other.speed.y()*other.speed.y()) * std::sqrt(v2.x()*v2.x() + v2.y()*v2.y());
+
+        double overlap = 0.5 * (minDist - dist);
+        position -= normal * overlap;
+        other.position += normal * overlap;
+    }
+}
+
+// void Ball::collide(Ball& other) {
+//     QPointF delta = other.getPosition() - position;
+//     double dist = std::hypot(delta.x(), delta.y());
+//     double minDist = radius + other.getRadius();
+
+//     if (dist < minDist && dist > 0) {
+//         // Вектор нормали
+//         QPointF norm = delta / dist;
+
+//         // Сколько нужно сдвинуть
+//         double overlap = 0.5 * (minDist - dist);
+
+//         // Просто раздвигаем, не меняя скоростей
+//         position -= norm * overlap;
+//         other.position += norm * overlap;
+//     }
+// }
+
+// field.h
+#ifndef FIELD_H
+#define FIELD_H
+
+#include <QWidget>
+#include <QVector>
+#include "ball.h"
+
+class Field : public QWidget {
+    Q_OBJECT
+
+public:
+    explicit Field(QWidget *parent = nullptr);
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+    void mousePressEvent(QMouseEvent*) override;
+    void mouseMoveEvent(QMouseEvent*) override;
+    void mouseReleaseEvent(QMouseEvent*) override;
+
+private slots:
+    void updateFrame();
+
+private:
+    QVector<Ball> balls;
+    QPointF mouseStart;
+    QPointF mouseEnd;
+    bool dragging = false;
+};
+
+#endif // FIELD_H
+
+// field.cpp
+#include "field.h"
+#include <QPainter>
+#include <QMouseEvent>
+#include <QTimer>
+
+Field::Field(QWidget *parent) : QWidget(parent) {
+    QTimer* timer = new QTimer(this);
+   connect(timer, &QTimer::timeout, this, &Field::updateFrame);
+   timer->start(10);
+}
+
+void Field::paintEvent(QPaintEvent*) {
+    QPainter painter(this);
+    painter.fillRect(rect(), Qt::white);
+
+    for (const Ball& ball : balls)
+        ball.draw(painter);
+
+    if (dragging) {
+        painter.setPen(QPen(Qt::black, 2));
+        painter.drawLine(mouseStart, mouseEnd);
+    }
+}
+
+void Field::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        mouseStart = event->pos();
+        mouseEnd = mouseStart;
+        dragging = true;
+    }
+}
+
+void Field::mouseMoveEvent(QMouseEvent *event) {
+    if (dragging) {
+        mouseEnd = event->pos();
+        update();
+    }
+}
+
+void Field::mouseReleaseEvent(QMouseEvent *event) {
+    if (dragging && event->button() == Qt::LeftButton) {
+        dragging = false;
+        QPointF direction = mouseStart - mouseEnd;
+        QPointF speed = direction * 0.02;
+        balls.append(Ball(mouseStart, speed, QColor(0, 0, 0)));
+        update();
+    }
+}
+
+void Field::updateFrame() {
+    QSize size = this->size();
+
+    for (Ball& ball : balls)
+        ball.update(size);
+
+    for (int i = 0; i < balls.size(); ++i) {
+        for (int j = i + 1; j < balls.size(); ++j) {
+            balls[i].collide(balls[j]);
+        }
+    }
+
+    update();
+}
+
+// mainwindow.h
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow>
+#include <QVector>
+#include <QPointF>
+#include <QTimer>
+#include "ball.h"
+
+class MainWindow : public QMainWindow {
+    Q_OBJECT
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+    void mousePressEvent(QMouseEvent*) override;
+    void mouseMoveEvent(QMouseEvent*) override;
+    void mouseReleaseEvent(QMouseEvent*) override;
+
+private slots:
+    void updateFrame();
+
+private:
+    QVector<Ball> balls;
+    QPointF startPoint;
+    QPointF currentPoint;
+    bool isDragging = false;
+
+    QColor randomColor() const;
+};
+
+#endif // MAINWINDOW_H
+
+// mainwindow.cpp
+#include "mainwindow.h"
+#include <QPainter>
+#include <QMouseEvent>
+#include <QRandomGenerator>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent) {
+    resize(800, 600);
+
+    QTimer* timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &MainWindow::updateFrame);
+    timer->start(10);
+}
+
+MainWindow::~MainWindow() {}
+
+void MainWindow::paintEvent(QPaintEvent*) {
+    QPainter painter(this);
+    painter.fillRect(rect(), Qt::white);
+
+    for (const Ball& ball : balls)
+        ball.draw(painter);
+
+    if (isDragging) {
+        painter.setPen(QPen(Qt::black, 2));
+        painter.drawLine(startPoint, currentPoint);
+    }
+}
+
+void MainWindow::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        startPoint = currentPoint = event->pos();
+        isDragging = true;
+        balls.append(Ball(startPoint, QPointF(0, 0), randomColor()));
+    }
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+    if (isDragging) {
+        currentPoint = event->pos();
+        update();
+    }
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
+    if (isDragging && event->button() == Qt::LeftButton) {
+        isDragging = false;
+
+        QPointF direction = currentPoint - startPoint;
+        double dx = direction.x();
+        double dy = direction.y();
+        double length = std::sqrt(dx * dx + dy * dy);
+        if (length == 0.0) length = 1.0;
+
+        QPointF speed = direction * 0.02; // множитель регулирует «силу броска»
+        balls.last() = Ball(startPoint, speed, balls.last().color);
+
+        update();
+    }
+}
+
+void MainWindow::updateFrame() {
+    QSize size = this->size();
+
+    for (Ball& ball : balls)
+        ball.update(size);
+
+    for (int i = 0; i < balls.size(); ++i) {
+        for (int j = i + 1; j < balls.size(); ++j) {
+            balls[i].collide(balls[j]);
+        }
+    }
+
+    update();
+}
+
+QColor MainWindow::randomColor() const {
+    int r = QRandomGenerator::global()->bounded(256);
+    int g = QRandomGenerator::global()->bounded(256);
+    int b = QRandomGenerator::global()->bounded(256);
+    return QColor(r, g, b);
+}
+

@@ -1,0 +1,484 @@
+//canvas.h
+#ifndef CANVAS_H
+#define CANVAS_H
+
+#include <QObject>
+#include <QLabel>
+#include <QPoint>
+#include <QMouseEvent>
+
+class Canvas : public QLabel
+{
+    Q_OBJECT
+public:
+    Canvas(QWidget *parent);
+signals:
+    void mouse_pressed(QPoint pos);
+    void mouse_dragged(QPoint pos);
+    void mouse_released(QPoint pos);
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+};
+
+#endif // CANVAS_H
+
+//canvas.cpp
+#include "canvas.h"
+
+Canvas::Canvas(QWidget *parent) : QLabel(parent) {}
+
+void Canvas::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton) return;
+    emit this->mouse_pressed(event->pos());
+}
+
+void Canvas::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton) return;
+    emit this->mouse_released(event->pos());
+}
+
+void Canvas::mouseMoveEvent(QMouseEvent *event)
+{
+    emit this->mouse_dragged(event->pos());
+}
+
+// mainwindow.h
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QApplication>
+#include <QMainWindow>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QToolBar>
+#include <QPixmap>
+#include <QKeySequence>
+#include <QLabel>
+#include <QScrollArea>
+#include <QColor>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QPainter>
+#include <QMouseEvent>
+#include <QPoint>
+#include <QDebug>
+#include <QColorDialog>
+#include <QToolBar>
+#include <QInputDialog>
+
+#include "canvas.h"
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+    enum STATES {
+        MAIN_COLOR = 0,
+        BACKGROUND_COLOR = 1,
+        COLOR_CHOOSING = 2,
+        LINE_WIDTH_CHOOSING = 4,
+        PENCIL = 8,
+        LINE = 16,
+        RECTANGLE = 32,
+        CIRCLE = 64,
+        DRAWING = 128,
+        CLEAR_INSTRUMENT = 0x87
+    };
+
+    QString filename;
+    QString filename_save = "";
+    bool isSaveNeeded = false;
+    QPixmap *mainBuffer = nullptr, *tempBuffer = nullptr, *displayBuffer = nullptr;
+    Canvas *displayLabel;
+    QScrollArea *displayArea;
+    size_t width;
+    size_t height;
+    int lineWidth;
+    QColor mainColor, backgroundColor;
+
+    int baseX, baseY;
+
+    int state;
+
+    QMenuBar *menuBar;
+    QMenu *fileMenu;
+    QAction *newAction;
+    QAction *openAction;
+    QAction *saveAction;
+    QAction *saveAsAction;
+    QAction *exitAction;
+
+    QMenu *toolsMenu;
+    QAction *useMainColorAction;
+    QAction *useBackgroundColorAction;
+    QAction *chooseColorAction;
+    QAction *chooseLineWidthAction;
+    QAction *usePencil;
+    QAction *useLine;
+    QAction *useRectangle;
+    QAction *useCircle;
+
+    QToolBar *toolBar;
+
+    void clear(int width, int height);
+    const QPixmap &makeColorIcon(const QColor& color);
+    void draw_buffer(QPixmap *pixmap);
+
+private slots:
+    void on_new();
+    void on_open();
+    void on_save();
+    void on_save_as();
+
+    void on_swap_color();
+    void on_choose_color();
+    void on_choose_line_width();
+    void on_use_pencil();
+    void on_use_line();
+    void on_use_rectangle();
+    void on_use_circle();
+
+    void on_mouse_pressed(QPoint pos);
+    void on_mouse_released(QPoint pos);
+    void on_mouse_dragged(QPoint pos);
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+};
+#endif // MAINWINDOW_H
+
+//mainwindow.cpp
+#include "mainwindow.h"
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+    this->setWindowTitle(QString("Paint"));
+
+    this->fileMenu = new QMenu("&Файл", this);
+    this->newAction = this->fileMenu->addAction("&Новый", QKeySequence("Ctrl+N"), this, &MainWindow::on_new);
+    this->openAction = this->fileMenu->addAction("&Открыть", QKeySequence("Ctrl+O"), this, &MainWindow::on_open);
+    this->saveAction = this->fileMenu->addAction("&Сохранить", QKeySequence("Ctrl+S"), this, &MainWindow::on_save);
+    this->saveAsAction = this->fileMenu->addAction("Сохранить &как", QKeySequence("Ctrl+Shift+S"), this, &MainWindow::on_save_as);
+    this->fileMenu->addSeparator();
+    this->exitAction = this->fileMenu->addAction("&Выйти", QKeySequence("Ctrl+Q"), QApplication::instance(), &QApplication::exit);
+
+
+    this->toolsMenu = new QMenu("&Инструменты", this);
+    this->useMainColorAction = this->toolsMenu->addAction("Основной &цвет", QKeySequence("Ctrl+W"), this, &MainWindow::on_swap_color);
+    this->useBackgroundColorAction = this->toolsMenu->addAction("Цвет &фона", QKeySequence("Ctrl+E"), this, &MainWindow::on_swap_color);
+    this->toolsMenu->addSeparator();
+    this->chooseColorAction = this->toolsMenu->addAction("Изменить ц&вет", QKeySequence("Ctrl+A"), this, &MainWindow::on_choose_color);
+    this->chooseLineWidthAction = this->toolsMenu->addAction("Изменить &ширину штриховки", QKeySequence("Ctrl+D"), this, &MainWindow::on_choose_line_width);
+    this->toolsMenu->addSeparator();
+    this->usePencil = this->toolsMenu->addAction(QIcon(":/icons/pencil.png"), "", QKeySequence("Ctrl+P"), this, &MainWindow::on_use_pencil);
+    this->usePencil->setToolTip("Карандаш");
+    this->useLine = this->toolsMenu->addAction(QIcon(":/icons/line.png"), "", QKeySequence("Ctrl+L"), this, &MainWindow::on_use_line);
+    this->useLine->setToolTip("Линия");
+    this->useRectangle = this->toolsMenu->addAction(QIcon(":/icons/rectangle.png"), "", QKeySequence("Ctrl+R"), this, &MainWindow::on_use_rectangle);
+    this->useRectangle->setToolTip("Прямоугольник");
+    this->useCircle = this->toolsMenu->addAction(QIcon(":/icons/circle.png"), "", QKeySequence("Ctrl+C"), this, &MainWindow::on_use_circle);
+    this->useCircle->setToolTip("Окружность");
+
+    this->menuBar = new QMenuBar(this);
+    this->menuBar->addMenu(this->fileMenu);
+    this->menuBar->addMenu(this->toolsMenu);
+    this->setMenuBar(this->menuBar);
+
+    this->setMenuBar(this->menuBar);
+
+    this->displayArea = new QScrollArea;
+    this->displayArea->setWidgetResizable(true);
+
+    this->displayLabel = new Canvas(this);
+    this->displayLabel->setAlignment(Qt::AlignTop);
+    this->displayArea->setWidget(this->displayLabel);
+
+    connect(this->displayLabel, SIGNAL(mouse_pressed(QPoint)), this, SLOT(on_mouse_pressed(QPoint)));
+    connect(this->displayLabel, SIGNAL(mouse_released(QPoint)), this, SLOT(on_mouse_released(QPoint)));
+    connect(this->displayLabel, SIGNAL(mouse_dragged(QPoint)), this, SLOT(on_mouse_dragged(QPoint)));
+
+    this->setCentralWidget(this->displayArea);
+
+    this->toolBar = new QToolBar("Инструменты", this);
+    this->addToolBar(this->toolBar);
+
+    this->toolBar->addAction(this->useMainColorAction);
+    this->toolBar->addAction(this->useBackgroundColorAction);
+    this->toolBar->addSeparator();
+    this->toolBar->addAction(this->chooseColorAction);
+    this->toolBar->addAction(this->chooseLineWidthAction);
+    this->toolBar->addSeparator();
+    this->toolBar->addAction(this->usePencil);
+    this->toolBar->addAction(this->useLine);
+    this->toolBar->addAction(this->useRectangle);
+    this->toolBar->addAction(this->useCircle);
+
+    this->clear(640, 480);
+}
+
+
+
+MainWindow::~MainWindow() {
+    delete this->mainBuffer;
+    delete this->tempBuffer;
+    delete this->menuBar;
+    delete this->fileMenu;
+    delete this->newAction;
+    delete this->openAction;
+    delete this->saveAction;
+    delete this->saveAsAction;
+    delete this->exitAction;
+    delete this->toolsMenu;
+    delete this->useMainColorAction;
+    delete this->useBackgroundColorAction;
+    delete this->chooseColorAction;
+    delete this->chooseLineWidthAction;
+    delete this->usePencil;
+    delete this->useLine;
+    delete this->useRectangle;
+    delete this->useCircle;
+}
+
+
+void MainWindow::clear(int width, int height)
+{
+    this->width = width;
+    this->height = height;
+    this->mainColor = QColor(0, 0, 0, 255);
+    this->useMainColorAction->setIcon(this->makeColorIcon(this->mainColor));
+    this->backgroundColor = QColor(255, 255, 255, 255);
+    this->useBackgroundColorAction->setIcon(this->makeColorIcon(this->backgroundColor));
+
+    if (this->mainBuffer != nullptr) delete this->mainBuffer;
+    if (this->displayBuffer != nullptr) delete this->displayBuffer;
+
+    this->mainBuffer = new QPixmap(this->width, this->height);
+    this->mainBuffer->fill(this->backgroundColor);
+
+    this->displayBuffer = new QPixmap(this->width, this->height);
+    this->displayBuffer->fill(this->backgroundColor);
+
+    this->displayLabel->setPixmap(*(this->displayBuffer));
+}
+
+const QPixmap &MainWindow::makeColorIcon(const QColor &color)
+{
+    QPixmap *icon = new QPixmap(16, 16);
+    icon->fill(color);
+    return *icon;
+}
+
+void MainWindow::on_new()
+{
+    this->clear(640, 480);
+    this->isSaveNeeded = true;
+}
+
+void MainWindow::on_open()
+{
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        "Открыть изображение",
+        "",
+        ""
+    );
+
+    if (filename.isEmpty()) return;
+
+    QPixmap *image = new QPixmap(filename);
+    if (image->isNull()){
+        QMessageBox::critical(
+            this,
+            "Ошибка чтения",
+            "Не удалось открыть файл " + filename
+        );
+        return;
+    }
+
+    this->clear(image->width(), image->height());
+
+    QPainter p1(this->mainBuffer);
+    p1.drawPixmap(0, 0, this->width, this->height, *image);
+    p1.end();
+
+    this->draw_buffer(this->mainBuffer);
+    this->isSaveNeeded = true;
+}
+
+void MainWindow::on_save()
+{
+    if (!this->isSaveNeeded) return;
+    if (this->filename_save.isEmpty()) {
+        this->on_save_as();
+    } else {
+        this->mainBuffer->save(this->filename_save);
+        this->isSaveNeeded = false;
+    }
+}
+
+void MainWindow::on_save_as()
+{
+    QString filename = QFileDialog::getSaveFileName(
+        this,
+        "Сохранить изображение как...",
+        "",
+        "PNG файлы (*.png);;JPEG файлы (*.jpg *.jpeg);;BMP файлы (*.bmp)"
+    );
+
+    if (filename.isEmpty()) return;
+
+    this->filename_save = filename;
+    this->mainBuffer->save(this->filename_save);
+    this->isSaveNeeded = false;
+}
+
+void MainWindow::on_swap_color()
+{
+    QColor t = this->mainColor;
+    this->mainColor = this->backgroundColor;
+    this->backgroundColor = t;
+
+    this->useMainColorAction->setIcon(this->makeColorIcon(this->mainColor));
+    this->useBackgroundColorAction->setIcon(this->makeColorIcon(this->backgroundColor));
+}
+
+void MainWindow::on_choose_color()
+{
+    QColor color = this->mainColor;
+    if (this->state & STATES::BACKGROUND_COLOR)
+        color = this->backgroundColor;
+    color = QColorDialog::getColor(color, this, "Выберете цвет");
+    if (color.isValid()) {
+        if (this->state & STATES::BACKGROUND_COLOR)
+            this->backgroundColor = color;
+        else
+            this->mainColor = color;
+    }
+
+    this->useMainColorAction->setIcon(this->makeColorIcon(this->mainColor));
+    this->useBackgroundColorAction->setIcon(this->makeColorIcon(this->backgroundColor));
+}
+
+
+
+void MainWindow::on_choose_line_width()
+{
+    bool ok;
+    int width = QInputDialog::getInt(
+        this,
+        "Толщина линии",
+        "Введите толщину линии:",
+        this->lineWidth,
+        1, 50,
+        1,
+        &ok
+    );
+    if (ok) {
+        this->lineWidth = width;
+    }
+}
+
+void MainWindow::on_use_pencil()
+{
+    this->state &= STATES::CLEAR_INSTRUMENT;
+    this->state |= STATES::PENCIL;
+}
+
+void MainWindow::on_use_line()
+{
+    this->state &= STATES::CLEAR_INSTRUMENT;
+    this->state |= STATES::LINE;
+}
+
+void MainWindow::on_use_rectangle()
+{
+    this->state &= STATES::CLEAR_INSTRUMENT;
+    this->state |= STATES::RECTANGLE;
+}
+
+void MainWindow::on_use_circle()
+{
+    this->state &= STATES::CLEAR_INSTRUMENT;
+    this->state |= STATES::CIRCLE;
+}
+
+
+void MainWindow::on_mouse_pressed(QPoint pos)
+{
+    this->state |= STATES::DRAWING;
+    this->baseX = pos.x();
+    this->baseY = pos.y();
+
+    if (this->tempBuffer != nullptr) delete this->tempBuffer;
+    this->tempBuffer = new QPixmap(this->width, this->height);
+
+    QPainter p(this->tempBuffer);
+    p.drawPixmap(0, 0, *this->mainBuffer);
+    p.end();
+}
+
+void MainWindow::on_mouse_released(QPoint pos)
+{
+    this->state &= ~STATES::DRAWING;
+
+    QPixmap *t = this->mainBuffer;
+    this->mainBuffer = this->tempBuffer;
+    delete t;
+    this->tempBuffer = nullptr;
+
+    this->draw_buffer(this->mainBuffer);
+    this->isSaveNeeded = true;
+}
+
+void MainWindow::on_mouse_dragged(QPoint pos)
+{
+    QPainter p(this->tempBuffer);
+    QPen pen(this->mainColor);
+    pen.setWidth(int(this->lineWidth));
+    p.setPen(pen);
+    p.setBrush(this->backgroundColor);
+
+    if (this->state & STATES::PENCIL) {
+        p.drawLine(this->baseX, this->baseY, pos.x(), pos.y());
+
+        this->baseX = pos.x();
+        this->baseY = pos.y();
+    }
+
+    if (this->state & STATES::LINE) {
+        p.drawPixmap(0, 0, *this->mainBuffer);
+        p.drawLine(this->baseX, this->baseY, pos.x(), pos.y());
+    }
+
+    if (this->state & STATES::RECTANGLE) {
+        p.drawPixmap(0, 0, *this->mainBuffer);
+        QRect rect(QPoint(this->baseX, this->baseY), pos);
+        p.drawRect(rect.normalized());
+    }
+
+    if (this->state & STATES::CIRCLE) {
+        p.drawPixmap(0, 0, *this->mainBuffer);
+        QRect rect(QPoint(this->baseX, this->baseY), pos);
+        p.drawEllipse(rect.normalized());
+    }
+
+    p.end();
+    this->draw_buffer(this->tempBuffer);
+}
+
+void MainWindow::draw_buffer(QPixmap *pixmap)
+{
+    QPainter p(this->displayBuffer);
+    p.drawPixmap(0, 0, *pixmap);
+    p.end();
+    this->displayLabel->setPixmap(*this->displayBuffer);
+    this->displayLabel->update();
+}
+
